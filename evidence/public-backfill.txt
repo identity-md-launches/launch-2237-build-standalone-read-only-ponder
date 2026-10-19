@@ -1,0 +1,6 @@
+00:53:23.449 INFO  Created database tables count=14 tables=["policy","equipment","reservation","renter","staff","administration","fee_request","accounting","payment","token_account","allowance","token","event_record","checkpoint"] (191ms)
+00:53:23.968 INFO  Started backfill indexing chain=rental block_range=[138710650,138754466]
+00:53:53.430 INFO  Finished fetching backfill JSON-RPC data chain=rental (29s)
+00:53:53.515 INFO  Completed backfill indexing across all chains (29s)
+00:53:53.652 INFO  Started returning 200 responses endpoint=/ready
+00:53:53.653 INFO  Completed indexing across all chains (29s)

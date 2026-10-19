@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:17.7-bookworm
+    environment:
+      POSTGRES_USER: rental
+      POSTGRES_DB: ${POSTGRES_DB:-rental}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U rental -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  indexer:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://rental:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-rental}
+      NODE_ENV: production
+      PORT: "42069"
+    ports:
+      - "127.0.0.1:${LOCAL_PORT:-42069}:42069"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:42069/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 3600s
+    restart: unless-stopped
+volumes:
+  pgdata:

@@ -1,0 +1,33 @@
+{
+  "name": "rental-trial-indexer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "packageManager": "pnpm@10.34.7",
+  "scripts": {
+    "dev": "ponder dev",
+    "start": "sh scripts/start.sh",
+    "codegen": "ponder codegen",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/unit.test.ts tests/reconcile.test.ts",
+    "test:integration": "tsx tests/integration.ts",
+    "reconcile": "tsx scripts/reconcile.ts",
+    "verify:public": "tsx scripts/verify-public.ts",
+    "check:queries": "tsx scripts/check-queries.ts"
+  },
+  "dependencies": {
+    "ponder": "0.18.2",
+    "hono": "4.13.13",
+    "viem": "2.57.7",
+    "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "24.10.1",
+    "@types/pg": "8.15.6",
+    "tsx": "4.20.6"
+  }
+}

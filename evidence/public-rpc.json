@@ -1,0 +1,235 @@
+{
+  "checks": {
+    "canonicalAfter": "0x198390e8346394fda55e74abb43cce543aff5768667adbf14bfc1c873bf90bad",
+    "canonicalBlock": {
+      "hash": "0x198390e8346394fda55e74abb43cce543aff5768667adbf14bfc1c873bf90bad",
+      "number": "138754466",
+      "timestamp": "1792417502"
+    },
+    "chainIdentity": 46630,
+    "discoveredEscrowEvents": [
+      {
+        "args": {
+          "newAdmin": "0x0fF6617f72544f60802b72D752dA7490C304CdeE",
+          "previousAdmin": "0x0000000000000000000000000000000000000000"
+        },
+        "block": "138710790",
+        "blockHash": "0x8cc266ca0e94db31383d6a652acb7c85c4aebeefbb5aa0ab0bbbcfaee014d2bd",
+        "eventName": "AdminTransferred",
+        "logIndex": 8,
+        "transactionHash": "0x6511e619c5f21a3b67d7a00f3f08684dd81af7c2c8b3e804657419b102d6be62"
+      },
+      {
+        "args": {
+          "cancellationFee": "5000000",
+          "deposit": "50000000",
+          "policyId": "1",
+          "reservationWindow": "86400"
+        },
+        "block": "138751948",
+        "blockHash": "0xbccfc74157c7f3c52a59cf91ce797e772eb1c2d5d4d4bee9baba6a8d7dd7aac0",
+        "eventName": "PolicyCreated",
+        "logIndex": 0,
+        "transactionHash": "0xbd70da3773b404e80652e6a39fa2cd80cb79ee28926619ee0e54d47c3ef14a61"
+      },
+      {
+        "args": {
+          "itemId": "1",
+          "metadataURI": "ipfs://rental-trial/cordless-drill",
+          "policyId": "1"
+        },
+        "block": "138752103",
+        "blockHash": "0xf584fddaa6d9d272367bb878b2847be03ca87a27dacbc678d5d294b3f3a18d3b",
+        "eventName": "ItemAdded",
+        "logIndex": 0,
+        "transactionHash": "0x8ae1ed455ba3ddbad7ac564296c5a152e00de240fedf1faf247150101286ce15"
+      },
+      {
+        "args": {
+          "cancellationFee": "5000000",
+          "clientRef": "0x0f3fcf2d397cb63077da241a2b9b0a8762d96b745c235f2e1993c749ba1aeaac",
+          "deposit": "50000000",
+          "expiresAt": "1792503764",
+          "itemId": "1",
+          "policyId": "1",
+          "renter": "0x0fF6617f72544f60802b72D752dA7490C304CdeE",
+          "reservationId": "1"
+        },
+        "block": "138753506",
+        "blockHash": "0x9272063365fdcee1a44e65c9474175851f24222ca7e2a0441e78b31537fed83e",
+        "eventName": "ReservationCreated",
+        "logIndex": 0,
+        "transactionHash": "0xa76bab03ddc27031aae4e4566c16f1f2149464a9dae14c812e420476ad6f2950"
+      },
+      {
+        "args": {
+          "amount": "45000000",
+          "beneficiary": "0x0fF6617f72544f60802b72D752dA7490C304CdeE",
+          "reservationId": "1"
+        },
+        "block": "138753874",
+        "blockHash": "0x89803efe4cf40bf5f0694d6d047f0e662609f3c4e9a2e064056274cfca2949c2",
+        "eventName": "RefundCredited",
+        "logIndex": 0,
+        "transactionHash": "0xb2321cc7e3cd3a51e427769eb94e7b7f87df1b2f3ae093848996e1c5e077191f"
+      },
+      {
+        "args": {
+          "fee": "5000000",
+          "itemId": "1",
+          "refund": "45000000",
+          "renter": "0x0fF6617f72544f60802b72D752dA7490C304CdeE",
+          "reservationId": "1"
+        },
+        "block": "138753874",
+        "blockHash": "0x89803efe4cf40bf5f0694d6d047f0e662609f3c4e9a2e064056274cfca2949c2",
+        "eventName": "ReservationCancelled",
+        "logIndex": 1,
+        "transactionHash": "0xb2321cc7e3cd3a51e427769eb94e7b7f87df1b2f3ae093848996e1c5e077191f"
+      },
+      {
+        "args": {
+          "amount": "45000000",
+          "beneficiary": "0x0fF6617f72544f60802b72D752dA7490C304CdeE"
+        },
+        "block": "138754138",
+        "blockHash": "0xf0b86eca797c1f69025b04fb4d361ee158f7b709c31c72ef2b1e642eea60b56e",
+        "eventName": "RefundWithdrawn",
+        "logIndex": 17,
+        "transactionHash": "0x272f8c03111d8d75efc5254f0a5c8d65d64e925dcf9e682fec7a0f66d06e3fdb"
+      },
+      {
+        "args": {
+          "amount": "5000000",
+          "requestId": "0xb5d4ba7e1b0d63f8be844a65244059d1f8808692685ecd0fd3778d676e543b78",
+          "to": "0x0fF6617f72544f60802b72D752dA7490C304CdeE"
+        },
+        "block": "138754466",
+        "blockHash": "0x198390e8346394fda55e74abb43cce543aff5768667adbf14bfc1c873bf90bad",
+        "eventName": "FeesWithdrawn",
+        "logIndex": 0,
+        "transactionHash": "0x87911ffadb4882d59cf8cd1979c4e49f0598f3f38206a15eed55716b1c00faf4"
+      }
+    ],
+    "escrowCodeAtExample": {
+      "bytes": 9717,
+      "keccak256": "0xe13dafc2ff386b594ade634e3443d2ca2a6042a3dbf83a3584a71d34f6cab302"
+    },
+    "escrowDeploymentBoundary": {
+      "atCodeHash": "0xe13dafc2ff386b594ade634e3443d2ca2a6042a3dbf83a3584a71d34f6cab302",
+      "beforeCodeAbsent": true
+    },
+    "escrowEventAudit": {
+      "fees": {
+        "0xb5d4ba7e1b0d63f8be844a65244059d1f8808692685ecd0fd3778d676e543b78": {
+          "amount": "5000000",
+          "blockNumber": "138754466",
+          "completed": true,
+          "recipient": "0x0ff6617f72544f60802b72d752da7490c304cdee",
+          "transactionHash": "0x87911ffadb4882d59cf8cd1979c4e49f0598f3f38206a15eed55716b1c00faf4"
+        }
+      },
+      "feesPaid": "5000000",
+      "refundsPaid": "45000000",
+      "renters": [
+        "0x0ff6617f72544f60802b72d752da7490c304cdee"
+      ],
+      "staff": {}
+    },
+    "fixedStorage": {
+      "accruedFees": "0",
+      "admin": "0x0fF6617f72544f60802b72D752dA7490C304CdeE",
+      "credit": "0",
+      "decimals": 6,
+      "escrowBalance": "0",
+      "feeRequest": [
+        "0x0fF6617f72544f60802b72D752dA7490C304CdeE",
+        "5000000",
+        true
+      ],
+      "holderBalance": "1000000000000",
+      "item": {
+        "activeReservationId": "0",
+        "exists": true,
+        "listed": true,
+        "metadataURI": "ipfs://rental-trial/cordless-drill",
+        "policyId": "1",
+        "state": 0
+      },
+      "itemCount": "1",
+      "pendingAdmin": "0x0000000000000000000000000000000000000000",
+      "policy": {
+        "cancellationFee": "5000000",
+        "deposit": "50000000",
+        "reservationWindow": "86400"
+      },
+      "policyCount": "1",
+      "reservation": {
+        "cancellationFee": "5000000",
+        "clientRef": "0x0f3fcf2d397cb63077da241a2b9b0a8762d96b745c235f2e1993c749ba1aeaac",
+        "createdAt": "1792417364",
+        "deposit": "50000000",
+        "expiresAt": "1792503764",
+        "itemId": "1",
+        "policyId": "1",
+        "renter": "0x0fF6617f72544f60802b72D752dA7490C304CdeE",
+        "status": 3
+      },
+      "reservationCount": "1",
+      "supply": "1000000000000",
+      "token": "0x31339619db548257cE09A76f189b0b1932f5c0cd",
+      "totalEscrowed": "0",
+      "totalLiabilities": "0",
+      "totalRefundCredits": "0"
+    },
+    "stateProviderAnchor": {
+      "hash": "0x198390e8346394fda55e74abb43cce543aff5768667adbf14bfc1c873bf90bad",
+      "number": "138754466"
+    },
+    "stateProviderAnchorAfter": "0x198390e8346394fda55e74abb43cce543aff5768667adbf14bfc1c873bf90bad",
+    "tokenCodeAtExample": {
+      "bytes": 2108,
+      "keccak256": "0x4a434f5008fa14d997462091d49cb70b03acf86db31b22010d4093a5bc87bd71"
+    },
+    "tokenDeploymentBoundary": {
+      "atCodeHash": "0x4a434f5008fa14d997462091d49cb70b03acf86db31b22010d4093a5bc87bd71",
+      "beforeCodeAbsent": true
+    }
+  },
+  "endpoint": "https://rpc.testnet.chain.robinhood.com",
+  "errors": [],
+  "fixedBlock": "138754466",
+  "stateEndpoint": "https://robinhood-testnet.drpc.org",
+  "earlierProviderLimitations": {
+    "defaultEndpoint": "https://rpc.testnet.chain.robinhood.com",
+    "defaultHistoricalReadFailures": [
+      {
+        "check": "tokenDeploymentBoundary",
+        "error": "UnknownRpcError: An unknown RPC error occurred.\n\nDetails: RPC eth_getCode: -32000 historical state 0cdfceeb1ba87784c8e79575da86331423a3b494baac8b9fd9ebc204d8893b34 is not available\nVersion: viem@2.57.7"
+      },
+      {
+        "check": "escrowCodeAtExample",
+        "error": "UnknownRpcError: An unknown RPC error occurred.\n\nDetails: RPC eth_getCode: -32000 historical state 7c057f5a1df4663727a73f587896553ee977fb7bec52688af8decc1c25a78841 is not available\nVersion: viem@2.57.7"
+      },
+      {
+        "check": "escrowDeploymentBoundary",
+        "error": "UnknownRpcError: An unknown RPC error occurred.\n\nDetails: RPC eth_getCode: -32000 historical state 88257caaa84b6e8be7905dcc4096b29297f721b2690b3aaaa719a7fa314be58c is not available\nVersion: viem@2.57.7"
+      },
+      {
+        "check": "fixedStorage",
+        "error": "ContractFunctionExecutionError: An unknown RPC error occurred.\n\nRaw Call Arguments:\n  to:    0x06135FF9311eCa80a7484444A552f28fFC660F05\n  data:  0xf851a440\n \nContract Call:\n  address:   0x06135FF9311eCa80a7484444A552f28fFC660F05\n  function:  admin()\n\nDocs: https://viem.sh/docs/contract/readContract\nDetails: RPC eth_call: -32000 historical state 7c057f5a1df4663727a73f587896553ee977fb7bec52688af8decc1c25a78841 is not available\nVersion: viem@2.57.7"
+      }
+    ],
+    "drpcLogRefusal": {
+      "httpStatus": 400,
+      "code": 35,
+      "message": "ranges over 10000 blocks are not supported on free plan",
+      "observedRange": "138710886..138711015"
+    },
+    "publicnode": {
+      "chainId": 46630,
+      "canonicalHash": "0x198390e8346394fda55e74abb43cce543aff5768667adbf14bfc1c873bf90bad",
+      "historicalCodeError": "historical state 7c057f5a1df4663727a73f587896553ee977fb7bec52688af8decc1c25a78841 is not available"
+    }
+  }
+}

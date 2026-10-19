@@ -1,0 +1,14 @@
+{
+  "database": "persistent PGlite",
+  "checks": [
+    "Anvil lifecycle transactions, immutable accepted terms, roles/revocation, cancellation, expiry, return, refunds/fees and donation",
+    "ordinary Ponder replay with duplicate RPC logs; GraphQL entity query and /ready",
+    "real CLI valid reconciliation plus missing/extra fee and staff (including revoked staff), altered historical payments/accepted terms/credits/liabilities/token balance rejection",
+    "Ponder start restart preserved same schema/database and checkpoint",
+    "read-only RPC outage reported and serving gated, followed by canonical catch-up",
+    "supported short reorg removed orphan event and restored canonical entities/accounting",
+    "fresh replay matches prior canonical entities and reconciles"
+  ],
+  "ok": true,
+  "scope": "Owned loopback Anvil 31337, persistent PGlite; PostgreSQL mode supplied but NOT RUN"
+}

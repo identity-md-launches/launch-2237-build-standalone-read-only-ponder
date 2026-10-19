@@ -1,0 +1,19 @@
+{
+  "endBlock": 138754466,
+  "indexed": {
+    "blockHash": "0x198390e8346394fda55e74abb43cce543aff5768667adbf14bfc1c873bf90bad",
+    "blockNumber": "138754466",
+    "chainId": 46630,
+    "id": "rental",
+    "timestamp": "1792417502"
+  },
+  "lag": "19014",
+  "mode": "bounded",
+  "observedAt": "2026-10-19T14:25:25.793Z",
+  "observedHead": {
+    "hash": "0x3416072f5f56709c871050efffb4cc99f5d3cdcae24d3e2791a014ab9be048d9",
+    "number": "138773480"
+  },
+  "provisional": true,
+  "rpcError": null
+}

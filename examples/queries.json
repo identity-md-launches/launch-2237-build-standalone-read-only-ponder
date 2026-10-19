@@ -1,0 +1,16 @@
+[
+  { "table": "equipment", "question": "What is available and what policy would the next reservation accept?", "query": "{ equipments(where: { listed: true, state: 0 }, limit: 20) { items { id metadataURI policyId policy { deposit cancellationFee reservationWindow } } } }" },
+  { "table": "policy", "question": "What terms belong to policy version 1?", "query": "{ policy(id: \"1\") { id deposit cancellationFee reservationWindow } }" },
+  { "table": "reservation", "question": "What did reservation 1 accept and what is its status?", "query": "{ reservation(id: \"1\") { id renter { id } itemId status policyId createdAt expiresAt deposit cancellationFee reservationWindow clientRef } }" },
+  { "table": "renter", "question": "What credit and cumulative deposit/refund payments belong to the trial account?", "query": "{ renter(id: \"0x0ff6617f72544f60802b72d752da7490c304cdee\") { credit depositsPaid refundsPaid } }" },
+  { "table": "payment", "question": "Which deposits, credits and payments belong to that renter?", "query": "{ payments(where: { account: \"0x0ff6617f72544f60802b72d752da7490c304cdee\" }, limit: 20, orderBy: \"blockNumber\", orderDirection: \"desc\") { items { id kind amount reservationId requestId blockNumber transactionHash } pageInfo { hasNextPage endCursor } } }" },
+  { "table": "staff", "question": "Which staff identities have ever been configured, including revoked staff?", "query": "{ staffs(limit: 20) { items { id enabled } } }" },
+  { "table": "administration", "question": "Who controls the escrow and is a handover pending?", "query": "{ administration(id: \"rental\") { admin pendingAdmin } }" },
+  { "table": "fee_request", "question": "Was the supplied fee request completed and paid?", "query": "{ feeRequest(id: \"0xb5d4ba7e1b0d63f8be844a65244059d1f8808692685ecd0fd3778d676e543b78\") { completed recipient amount transactionHash blockNumber } }" },
+  { "table": "accounting", "question": "What is currently owed, already paid and held by escrow?", "query": "{ accounting(id: \"rental\") { escrowed refundCredits accruedFees liabilities refundsPaid feesPaid tokenBalance } }" },
+  { "table": "token_account", "question": "How much of the fixed supply is back in the trial account?", "query": "{ tokenAccount(id: \"0x0ff6617f72544f60802b72d752da7490c304cdee\") { id balance } }" },
+  { "table": "allowance", "question": "What amounts were most recently emitted by Approval for each owner/spender?", "query": "{ allowances(limit: 20) { items { owner spender amount } } }" },
+  { "table": "token", "question": "What token units and supply are used?", "query": "{ tokens(limit: 5) { items { id name symbol decimals totalSupply } } }" },
+  { "table": "event_record", "question": "What events and canonical positions explain recent changes?", "query": "{ eventRecords(limit: 20, orderBy: \"blockNumber\", orderDirection: \"desc\") { items { id name blockNumber blockHash transactionHash transactionIndex logIndex args } pageInfo { hasNextPage endCursor } } }" },
+  { "table": "checkpoint", "question": "Which completed block anchors a coherent snapshot?", "query": "{ checkpoint(id: \"rental\") { chainId blockNumber blockHash timestamp } }" }
+]

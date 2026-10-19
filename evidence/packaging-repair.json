@@ -1,0 +1,40 @@
+{
+  "measuredAtUTC": "2026-10-19T14:34:00.382897+00:00",
+  "scope": "Packaging repair only; prior runtime evidence retained unchanged",
+  "tools": {
+    "node": "24.21.0",
+    "pnpm": "10.34.7"
+  },
+  "checks": [
+    {
+      "command": "pnpm install --frozen-lockfile --store-dir /tmp/rental-repair-store",
+      "result": "PASS; clean scratch copy, fresh external store, 170 packages fetched from registry"
+    },
+    {
+      "command": "pnpm codegen",
+      "result": "PASS"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS"
+    },
+    {
+      "command": "pnpm test",
+      "result": "PASS; 23 tests, zero failures/skips"
+    }
+  ],
+  "notRerun": [
+    "Public RPC/backfill/query/reconciliation (application source unchanged)",
+    "Anvil integration",
+    "Docker/Compose/Railway"
+  ],
+  "limitation": "Removed generated dependency cache to meet 8 MiB upload limit. Fresh offline installation is UNMET. Ordinary registry installation is verified.",
+  "sourceBytesBeforeThisEvidence": 381856,
+  "uploadLimitBytes": 8388608,
+  "unchangedLockfileSHA256": "99fe2aa86d3978f8ebbc9c4327b479e5ccc035bd1f0d290fd93082e003f6927f",
+  "sizeChecks": {
+    "fullStoreTarXzBytes": 54613156,
+    "sourceTarGzipBytesBeforeFinalEvidenceUpdate": 106755,
+    "method": "Complete deliverable tree excluding protected metadata, inputs and test/scratch; no application files omitted"
+  }
+}

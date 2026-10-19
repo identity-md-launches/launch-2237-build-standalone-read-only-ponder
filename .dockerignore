@@ -1,0 +1,12 @@
+.git
+.github
+.imd
+.agents
+.aws
+.codex
+node_modules
+.ponder
+generated
+test/scratch
+.env*
+*.log

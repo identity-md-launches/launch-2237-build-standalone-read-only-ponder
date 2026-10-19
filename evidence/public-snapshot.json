@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "deployment": {
+    "chainId": 46630,
+    "token": "0x31339619db548257ce09a76f189b0b1932f5c0cd",
+    "escrow": "0x06135ff9311eca80a7484444a552f28ffc660f05",
+    "tokenStart": 138710650,
+    "escrowStart": 138710790
+  },
+  "tables": {
+    "policy": [
+      {
+        "id": "1",
+        "deposit": "50000000",
+        "cancellationFee": "5000000",
+        "reservationWindow": "86400"
+      }
+    ],
+    "equipment": [
+      {
+        "id": "1",
+        "exists": "true",
+        "listed": "true",
+        "state": "0",
+        "policyId": "1",
+        "activeReservationId": "0",
+        "metadataURI": "ipfs://rental-trial/cordless-drill"
+      }
+    ],
+    "reservation": [
+      {
+        "id": "1",
+        "itemId": "1",
+        "renter": "0x0ff6617f72544f60802b72d752da7490c304cdee",
+        "policyId": "1",
+        "createdAt": "1792417364",
+        "expiresAt": "1792503764",
+        "status": "3",
+        "deposit": "50000000",
+        "cancellationFee": "5000000",
+        "reservationWindow": "86400",
+        "clientRef": "0x0f3fcf2d397cb63077da241a2b9b0a8762d96b745c235f2e1993c749ba1aeaac"
+      }
+    ],
+    "renter": [
+      {
+        "id": "0x0ff6617f72544f60802b72d752da7490c304cdee",
+        "credit": "0",
+        "depositsPaid": "50000000",
+        "refundsPaid": "45000000"
+      }
+    ],
+    "staff": [],
+    "administration": [
+      {
+        "id": "rental",
+        "admin": "0x0ff6617f72544f60802b72d752da7490c304cdee",
+        "pendingAdmin": "0x0000000000000000000000000000000000000000"
+      }
+    ],
+    "feeRequest": [
+      {
+        "id": "0xb5d4ba7e1b0d63f8be844a65244059d1f8808692685ecd0fd3778d676e543b78",
+        "recipient": "0x0ff6617f72544f60802b72d752da7490c304cdee",
+        "amount": "5000000",
+        "completed": "true",
+        "transactionHash": "0x87911ffadb4882d59cf8cd1979c4e49f0598f3f38206a15eed55716b1c00faf4",
+        "blockNumber": "138754466"
+      }
+    ],
+    "accounting": [
+      {
+        "id": "rental",
+        "escrowed": "0",
+        "refundCredits": "0",
+        "accruedFees": "0",
+        "liabilities": "0",
+        "refundsPaid": "45000000",
+        "feesPaid": "5000000",
+        "tokenBalance": "0"
+      }
+    ],
+    "tokenAccount": [
+      {
+        "id": "0x0ff6617f72544f60802b72d752da7490c304cdee",
+        "balance": "1000000000000"
+      },
+      {
+        "id": "0x06135ff9311eca80a7484444a552f28ffc660f05",
+        "balance": "0"
+      }
+    ],
+    "allowance": [
+      {
+        "id": "0x0ff6617f72544f60802b72d752da7490c304cdee:0x06135ff9311eca80a7484444a552f28ffc660f05",
+        "owner": "0x0ff6617f72544f60802b72d752da7490c304cdee",
+        "spender": "0x06135ff9311eca80a7484444a552f28ffc660f05",
+        "amount": "50000000"
+      }
+    ],
+    "token": [
+      {
+        "id": "0x31339619db548257ce09a76f189b0b1932f5c0cd",
+        "name": "kkk",
+        "symbol": "dds",
+        "decimals": "6",
+        "totalSupply": "1000000000000"
+      }
+    ],
+    "checkpoint": [
+      {
+        "id": "rental",
+        "chainId": "46630",
+        "blockNumber": "138754466",
+        "blockHash": "0x198390e8346394fda55e74abb43cce543aff5768667adbf14bfc1c873bf90bad",
+        "timestamp": "1792417502"
+      }
+    ]
+  },
+  "eventMaxBlock": "138754466"
+}

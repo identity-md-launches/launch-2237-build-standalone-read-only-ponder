@@ -1,0 +1,28 @@
+{
+  "repository": "https://github.com/identity-md-launches/launch-1988-kkk",
+  "commit": "6ce8023819f68d2b84f2151b24285af477f4d9c7",
+  "compiler": "0.8.26+commit.8a97fa7a",
+  "settings": {
+    "optimizer": true,
+    "optimizer_runs": 200,
+    "evm_version": "cancun",
+    "via_ir": false
+  },
+  "contracts": {
+    "MockPaymentToken": {
+      "source": "src/MockPaymentToken.sol",
+      "sourceSHA256": "3ad0cfaf6a99370c591e61460c443c1fb5a1f79052396822c1a6ced316c65e7d",
+      "abiSHA256": "90f1473d6a574c2a7b869adf47755f1a2c147698f797d3370e8b749cec9ade7c",
+      "artifactSHA256": "5e76fe5f9d2f418b13bcc0ef5fbefe40bc23befd98a81b5884ba90c1c644c7f1",
+      "fixtureSHA256": "fd75136c4bc378b92cad17250fc312d6ab7b469ff2423290604685cdcbbdbd06"
+    },
+    "RentalEscrow": {
+      "source": "src/RentalEscrow.sol",
+      "sourceSHA256": "83d3ecf8b8ad4322221b9c2bc9790dbc5726a9d5929b87ed06e6642ec2d3d21e",
+      "abiSHA256": "d2962bd52fad92e3b44aea744109c26e38f33ce07f4da65874369a6b5157fbed",
+      "artifactSHA256": "92d7d921d5fd0ca0f930ae73a367d1542a686e125f615e46d1b5ab2f7770a99c",
+      "fixtureSHA256": "1e230a47f6d0feeecc165481919c10a9fb3966e34f545e4b5c220bc7f9aa63a6"
+    }
+  },
+  "runtimeSHA256": "babcced980668533cf6684acdbd57c01cdb9e0a5ab002ed8f8e169f4ab00c58c"
+}
