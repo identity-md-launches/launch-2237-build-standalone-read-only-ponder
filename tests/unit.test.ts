@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import "./health.test";
+import "./serving.test";
 import { apply, ZERO } from "../shared/project";
 import { settings } from "../shared/config";
 import { MemoryStore, addr, hash, event, json } from "./memory";

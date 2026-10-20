@@ -6,7 +6,12 @@
 export const HEALTH_VERSION = 1 as const;
 
 export type ProbeState = "ok" | "failed" | "timeout";
-export type NativeReadiness = "ready" | "not_ready" | "failed" | "timeout";
+/**
+ * Native Ponder /ready: 200 is "ready", the documented startup/backfill 503 is
+ * "not_ready", any other HTTP status is "unexpected", and a network/abort
+ * failure is "failed" or "timeout".
+ */
+export type NativeReadiness = "ready" | "not_ready" | "unexpected" | "failed" | "timeout";
 export type ServingStatus = "ready" | "catching_up" | "unavailable";
 export type HealthReason =
   | "checkpoint_missing"
@@ -18,7 +23,9 @@ export type HealthReason =
   | "rpc_unavailable"
   | "rpc_timeout"
   | "readiness_unavailable"
-  | "readiness_timeout";
+  | "readiness_unexpected_response"
+  | "readiness_timeout"
+  | "probe_timeout";
 
 export type Checkpoint = { blockNumber: bigint; blockHash: string; timestamp: bigint };
 export type ObservedHead = { number: bigint; hash: string | null };
@@ -26,7 +33,10 @@ export type ObservedHead = { number: bigint; hash: string | null };
 export type ServingObservation = {
   checkpoint: Checkpoint | null;
   observedHead: ObservedHead | null;
-  /** Milliseconds since epoch when the RPC-head attempt completed. */
+  /**
+   * Milliseconds since epoch when the RPC-head attempt actually completed
+   * within the probe deadline; null when it did not complete in time.
+   */
   observedAt: number | null;
   database: ProbeState;
   rpc: ProbeState;
@@ -35,6 +45,11 @@ export type ServingObservation = {
   /** Present only in bounded mode. */
   endBlock: bigint | null;
   maxServingLag: bigint;
+  /**
+   * Set when the probe as a whole missed its deadline. Individual dependencies
+   * that missed it are already "timeout"; this covers unattributable lateness.
+   */
+  probeTimedOut?: boolean;
 };
 
 export type ServingDecision = {
@@ -59,6 +74,8 @@ export function decideServing(observation: ServingObservation): ServingDecision 
   if (observation.rpc !== "ok" || !observation.observedHead) return result("unavailable", unavailable(observation.rpc, "rpc"));
   if (observation.nativeReadiness === "timeout") return result("unavailable", "readiness_timeout");
   if (observation.nativeReadiness === "failed") return result("unavailable", "readiness_unavailable");
+  if (observation.nativeReadiness === "unexpected") return result("unavailable", "readiness_unexpected_response");
+  if (observation.probeTimedOut) return result("unavailable", "probe_timeout");
   if (!observation.checkpoint) return result("catching_up", "checkpoint_missing");
   if (observation.nativeReadiness === "not_ready") return result("catching_up", "indexer_catching_up");
 
@@ -113,43 +130,76 @@ export function healthPayload(decision: ServingDecision): HealthPayload {
   };
 }
 
+export type Clock = {
+  now(): number;
+  setTimeout(callback: () => void, ms: number): unknown;
+  clearTimeout(handle: unknown): void;
+};
+export const systemClock: Clock = {
+  now: () => Date.now(),
+  setTimeout: (callback, ms) => setTimeout(callback, ms),
+  clearTimeout: handle => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
+
+/** Timing of one underlying operation, passed to the loader and timeout handler. */
+export type BoundedRun = { startedAt: number; deadlineAt: number };
+
 type CachedLoaderOptions<T> = {
   cacheMs: number;
   timeoutMs: number;
   now?: () => number;
-  onTimeout: () => T;
-  onFailure: () => T;
+  clock?: Clock;
+  onTimeout: (run: BoundedRun) => T;
+  onFailure: (run: BoundedRun) => T;
 };
 
 /**
- * Cache both success and failure and permit at most one underlying operation.
- * A timed-out operation stays in-flight until it actually settles; callers get
- * the cached timeout result instead of starting unbounded replacement work.
+ * Single-flight, deadline-bounded observation cache.
+ *
+ * - At most one underlying operation is active. Reads during an operation that
+ *   already missed its deadline get the timeout result immediately and start
+ *   nothing new, so a stuck dependency cannot accumulate work.
+ * - Only an operation that settled within its deadline is cached, and its age
+ *   is measured from when it STARTED, so a cached value is never older than
+ *   `cacheMs` relative to the moment its observations began.
+ * - A late result (settled after its deadline) is discarded, never cached as
+ *   fresh. Once it settles, the next read starts a fresh operation, which has
+ *   to complete within its own deadline before anything is reported as ok.
  */
-export function createBoundedCache<T>(load: () => Promise<T>, options: CachedLoaderOptions<T>) {
-  const now = options.now ?? Date.now;
-  let cached: { at: number; value: T } | undefined;
-  let active: Promise<void> | undefined;
+export function createBoundedCache<T>(load: (run: BoundedRun) => Promise<T>, options: CachedLoaderOptions<T>) {
+  const clock: Clock = options.clock ?? (options.now ? { ...systemClock, now: options.now } : systemClock);
+  let cached: { startedAt: number; value: T } | undefined;
+  let active: { run: BoundedRun; settled: Promise<{ value: T; late: boolean }> } | undefined;
 
   const start = () => {
-    if (active) return;
-    active = load()
-      .then(value => { cached = { at: now(), value }; })
-      .catch(() => { cached = { at: now(), value: options.onFailure() }; })
-      .finally(() => { active = undefined; });
+    const startedAt = clock.now();
+    const run: BoundedRun = { startedAt, deadlineAt: startedAt + options.timeoutMs };
+    const settled = Promise.resolve()
+      .then(() => load(run))
+      .then(value => value, () => options.onFailure(run))
+      .then(value => {
+        const late = clock.now() > run.deadlineAt;
+        if (!late) cached = { startedAt, value };
+        return { value, late };
+      })
+      .finally(() => { if (active?.settled === settled) active = undefined; });
+    active = { run, settled };
+    return active;
   };
-  const timeout = () => new Promise<"timeout">(resolve => setTimeout(() => resolve("timeout"), options.timeoutMs));
 
   return {
     async read(): Promise<T> {
-      const at = now();
-      if (cached && at - cached.at < options.cacheMs) return cached.value;
-      start();
-      const completed = await Promise.race([active!.then(() => "done" as const), timeout()]);
-      if (completed === "done" && cached) return cached.value;
-      const value = options.onTimeout();
-      cached = { at: now(), value };
-      return value;
+      if (cached && clock.now() - cached.startedAt < options.cacheMs) return cached.value;
+      const { run, settled } = active ?? start();
+      const remaining = run.deadlineAt - clock.now();
+      let handle: unknown;
+      const outcome = remaining <= 0 ? "timeout" as const : await Promise.race([
+        settled,
+        new Promise<"timeout">(resolve => { handle = clock.setTimeout(() => resolve("timeout"), remaining); }),
+      ]);
+      if (handle !== undefined) clock.clearTimeout(handle);
+      if (outcome !== "timeout" && !outcome.late) return outcome.value;
+      return options.onTimeout(run);
     },
   };
 }

@@ -77,7 +77,7 @@ No `railway.json` or `railway.toml` overrides the Dockerfile. Production never f
 |---|---|
 | `/health` | Ponder process/server is up; may be incomplete or stale |
 | `/ready` | Ponder completed historical indexing for its configured target; does not continuously certify RPC freshness |
-| `/sync` | Recorded completed checkpoint **block number/hash/timestamp**, independently observed RPC head number/hash, observation time, signed block lag, RPC error, live/bounded mode |
+| `/sync` | Recorded completed checkpoint **block number/hash/timestamp**, independently observed RPC head number/hash, observation time, signed block lag, safe RPC error code, live/bounded mode |
 | `/healthz` | Versioned, safe query-serving eligibility observation; 200 only when `ready`, otherwise 503. It has `Cache-Control: no-store`. |
 | `/status` | Ponder's own indexed progress, not an independently observed head |
 | `/graphql` | Read-only entity queries, gated by readiness and observed lag/errors |
@@ -91,13 +91,38 @@ No `railway.json` or `railway.toml` overrides the Dockerfile. Production never f
 {"version":1,"status":"ready","reason":null,"indexedCheckpoint":{"blockNumber":"138754400","blockHash":"0x…","timestamp":"1760000000"},"observedHead":{"blockNumber":"138754520","blockHash":"0x…"},"observedAt":"2026-10-20T12:00:00.000Z","lag":"120","servingLimit":"200","mode":"live","targetBlock":null}
 ```
 
-`ready` means the native Ponder readiness check, PostgreSQL checkpoint read and independent RPC-head observation succeeded, and the completed checkpoint is within the serving policy. `catching_up` means a checkpoint is missing, native Ponder is still backfilling, or normal backlog exceeds the live limit. `unavailable` means a dependency failed or timed out. In live mode `servingLimit` is `MAX_SERVING_LAG` (default 200 blocks). In bounded mode it is `"0"`, `targetBlock` is the configured `END_BLOCK`, and readiness requires the checkpoint to reach that target even if the observed live head is newer. This is an observed freshness/dependency check only: it does **not** promise finality, capacity, future availability, complete RPC history, or immunity from reorgs.
+`ready` means the native Ponder readiness check, PostgreSQL checkpoint read and independent RPC-head observation all completed within the health deadline and succeeded, and the completed checkpoint is within the serving policy. `catching_up` means a checkpoint is missing, native Ponder `/ready` answered its documented startup/backfill **503**, or normal backlog exceeds the live limit. `unavailable` means a dependency failed or timed out. In live mode `servingLimit` is `MAX_SERVING_LAG` (default 200 blocks). In bounded mode it is `"0"`, `targetBlock` is the configured `END_BLOCK`, and readiness requires the checkpoint to reach that target even if the observed live head is newer. This is an observed freshness/dependency check only: it does **not** promise finality, capacity, future availability, complete RPC history, or immunity from reorgs.
 
-Health dependencies use `HEALTH_TIMEOUT_MS` (default 2500 ms) and their completed outcome is shared for `HEALTH_CACHE_MS` (default 1000 ms). At most one slow probe remains in flight; timeout returns an `unavailable` result rather than accumulating more database/RPC work. Set the health deadline below the platform's probe timeout. GraphQL and SQL use the same cached decision, so they agree with `/healthz` for the same observations.
+Reason codes:
+
+| `reason` | `status` | Meaning |
+|---|---|---|
+| `null` | `ready` | Eligible to serve queries |
+| `checkpoint_missing` | `catching_up` | No completed checkpoint row yet |
+| `indexer_catching_up` | `catching_up` | Native Ponder `/ready` answered HTTP 503 (startup/backfill) |
+| `lag_exceeded` | `catching_up` | Live checkpoint lag above `MAX_SERVING_LAG` |
+| `end_block_not_reached` | `catching_up` | Bounded mode below `END_BLOCK` |
+| `database_unavailable` / `database_timeout` | `unavailable` | Checkpoint read failed / did not complete within `HEALTH_TIMEOUT_MS` |
+| `rpc_unavailable` / `rpc_timeout` | `unavailable` | Head probe failed (including wrong chain) / did not complete in time |
+| `readiness_unavailable` / `readiness_timeout` | `unavailable` | Native `/ready` request failed / did not complete in time |
+| `readiness_unexpected_response` | `unavailable` | Native `/ready` answered any HTTP status other than 200 or 503 (for example 500 or 404) |
+| `probe_timeout` | `unavailable` | The probe missed its deadline and no single dependency can be blamed |
+
+When more than one dependency is unavailable the first in the order database, RPC, native readiness is reported; each dependency's outcome is its own, so an RPC-only timeout with a healthy database reports `rpc_timeout`, not `database_timeout`.
+
+Health dependencies run together under one `HEALTH_TIMEOUT_MS` deadline (default 2500 ms). Rules, shared by `/healthz`, `/sync`, `/graphql` and `/sql/*`:
+
+- **Single flight.** At most one probe (one checkpoint read, one head request, one native `/ready` request) is in flight. While a probe that has already missed its deadline is still running, every check answers at once from what completed by the deadline and starts no new work, so a slow dependency never accumulates probes.
+- **Per-dependency outcomes.** At the deadline each dependency is reported as what it actually did: completed (ok or failed) or `timeout`. Values from dependencies that completed in time are shown (for example the real head and its real `observedAt` when only the database is slow); a dependency that did not complete contributes `null`, and `observedAt` is `null` unless the head request really completed in time. Nothing is reported as a successful observation that did not happen.
+- **Late results are discarded.** A probe that settles after its deadline is never cached or used, however good its values look. The next check starts a fresh probe, and queries become eligible again only when a fresh probe completes within its deadline and passes the policy.
+- **Bounded age.** A probe that completed in time is reused for `HEALTH_CACHE_MS` (default 1000 ms) measured from when the probe **started**, so a served decision never rests on observations older than that.
+- **Recovery** needs no restart: once the dependency answers normally, the next fresh probe reflects it.
+
+Set the health deadline below the platform's probe timeout. A dependency call that never settles at all (a database query that hangs forever) keeps the single probe in flight and the API `unavailable` until it settles or the process is restarted; this is the deliberate trade-off for never stacking up work.
 
 `/sync.indexed` is an actual onchain checkpoint row written after all logs in its block, never the RPC head relabeled as indexed progress. Default checkpoint spacing is **100 blocks**, so it is a conservative lower bound; GraphQL may contain more recent event state. `CHECKPOINT_INTERVAL=1` gives every-block checkpoints at higher RPC cost. Bounded runs additionally checkpoint exactly `END_BLOCK`.
 
-`lag = observedHead.number - indexed.blockNumber`; it can briefly be negative when the indexer advances beyond a cached observation. Errors clear the current head to null rather than inventing progress. `rpcError` describes the independent head probe; detailed backfill/log RPC errors are reported in Ponder logs and metrics even if the head probe succeeds. `/sync` itself may be unavailable if the database/server is down. Alert on request failures, `unavailable` health, rising lag and a nonadvancing checkpoint even if `/ready` remains 200. GraphQL/SQL require the shared `/healthz` decision to be ready; bounded runs require reaching the exact end block. A normal recovery is reflected after at most the configured health cache interval; a genuinely stuck dependency remains a single in-flight check and stays unavailable until it settles or the process is recovered.
+`lag = observedHead.number - indexed.blockNumber`; it can briefly be negative when the indexer advances beyond a cached observation. Errors and timeouts clear the current head to null rather than inventing progress. `rpcError` is a safe code for the independent head probe — `rpc_unavailable`, `rpc_timeout` or `rpc_wrong_chain`, else `null` — never the raw exception text or endpoint (95cf662 and 7631f26 returned the raw message here; the field name and response shape are unchanged); detailed backfill/log RPC errors are reported in Ponder logs and metrics even if the head probe succeeds. `/sync` itself may be unavailable if the database/server is down. Alert on request failures, `unavailable` health, rising lag and a nonadvancing checkpoint even if `/ready` remains 200. GraphQL/SQL require the shared `/healthz` decision to be ready; bounded runs require reaching the exact end block. A normal recovery is reflected after at most the configured health cache interval; a genuinely stuck dependency remains a single in-flight check and stays unavailable until it settles or the process is recovered.
 
 Latest results are **provisional**. Ponder handles canonical rollback within `REORG_WINDOW_SECONDS` (default 180 chain-timestamp seconds, supported range 0–600); neither that setting nor readiness establishes L1 settlement/finality. During reorg detection, stale/orphan data can be visible briefly. Deep reorgs, resets and inconsistent providers require investigation and deliberate replay into a new schema. Do not make irreversible equipment handovers based solely on this trial's index.
 
@@ -275,9 +300,20 @@ A changed release backfills a distinct schema and only then updates the stable `
 
 ### API-only update and rollback procedure
 
-Treat an API/source update as a single-writer operation. First retain the currently running image, environment and computed physical schema; do not remove `pgdata`, run `down -v`, reset Ponder, or prune schemas. Build/pull the reviewed image, then stop the current **indexer only** before starting the replacement with the same PostgreSQL volume/service. Do not run two `ponder start` writers against one physical schema. Watch logs, `/ready`, then `/healthz` and one authenticated query before moving a reverse-proxy/API route. Compose has expected downtime while the replacement backfills; `/healthz: catching_up` calls for monitoring progress, not an automatic restart loop.
+**This API update is a new physical schema and a full backfill.** The deployment fingerprint hashes all of `src/`, `shared/`, `scripts/` and the ABIs, so the API/health changes in this release (and in 7631f26) produce a different `<prefix>_<24 hex>` schema than the deployed 95cf662. The new release does **not** resume 95cf662's schema: it replays from the configured start blocks into its own schema and publishes the `PONDER_VIEWS_SCHEMA` views only once ready. This is intended; the fingerprint is not altered and there is no migration that reuses the old schema. Plan for the backfill time and RPC cost. Before and after, `pnpm exec tsx scripts/deployment.ts` in each release's environment prints its schema name.
 
-To roll back the API, stop that replacement indexer, restore the retained prior image/source plus exactly its prior deployment settings, and start only that one writer against the preserved database/volumes. Wait for `/ready`, confirm `/healthz` and a query, then move API traffic back. Leave both schemas and the database volume intact until validation and the rollback window have passed. This procedure was reviewed against the deterministic-schema/start script; Docker/Compose, Railway traffic switching, backups and restore were **NOT RUN** on this worker.
+Treat the update as a single-writer operation. First record the currently running image/source (95cf662), its environment and its computed physical schema; do not remove `pgdata`, run `down -v`, reset Ponder or prune schemas. Retain **both** schemas — the old one is the rollback target — until validation and the rollback window have passed. Build/pull the reviewed image, then stop the current **indexer only** before starting the replacement with the same PostgreSQL volume/service. Never run two `ponder start` processes that overlap as writers: not on one physical schema, and not as two releases both publishing the same views schema. (On Railway a new deployment starts while the previous one still runs. For this update the two processes use different schemas, which Ponder supports, but do not start a third deployment of either release while one is backfilling, and when rolling back remove the active replacement deployment before redeploying 95cf662: two live deployments of one release would compute the same schema and write it together.) Watch logs and `/ready`, then `/healthz` and one real query before moving a reverse-proxy/API route. Compose has expected downtime while the replacement backfills; `/healthz: catching_up` calls for monitoring progress, not an automatic restart loop.
+
+To roll back to 95cf662, stop the replacement indexer first, then restore the retained 95cf662 image/source plus exactly its prior deployment settings, and start only that one writer against the preserved database/volume. Because its source and settings are unchanged, it computes its old schema name and resumes it (no fresh backfill unless that schema was removed). **95cf662 has no `/healthz`**; do not use it for rollback validation. Validate with what 95cf662 supports:
+
+```sh
+curl -i http://127.0.0.1:42069/ready   # 200 once 95cf662's schema has caught up
+curl -s http://127.0.0.1:42069/sync    # indexed checkpoint vs observed head; check lag and rpcError is null
+curl -s http://127.0.0.1:42069/graphql -H 'content-type: application/json' \
+  -d '{"query":"{ accounting(id: \"rental\") { liabilities tokenBalance } }"}'
+```
+
+The GraphQL query must return `data`, not 503. Then move API traffic back. A later roll-forward to this release resumes this release's preserved schema if it was kept. This procedure was reviewed against the deterministic-schema/start script; Docker/Compose, Railway traffic switching, backups and restore were **NOT RUN** on this worker.
 
 List and deliberately clean up only after verifying backups, retention and that no serving/rollback deployment needs those schemas:
 
@@ -315,10 +351,10 @@ Worker commands were run in a complete source copy under `test/scratch/project/`
 | `pnpm install --frozen-lockfile` in a clean copy | PASS (see final checks record) |
 | `pnpm codegen` | PASS; committed `ponder-env.d.ts` |
 | `pnpm typecheck` | PASS |
-| `pnpm test` | PASS in this maintenance change; 28 offline tests including `/healthz` HTTP/no-store JSON, shared eligibility, failures/timeouts and cache recovery |
+| `pnpm test` | PASS in the health repair: 37 offline tests (the 28 earlier ones unchanged plus 9 in `tests/serving.test.ts`). The new tests drive the production `createApi` routes/guards (`src/api/app.ts`) over the production `createServingProbe` (`src/api/probe.ts`) with a manual clock and controlled database/RPC/native-`/ready`/GraphQL/SQL stand-ins: delayed checkpoint + head advance (timeout, no new work, late 900/1000 sample discarded, fresh lag 700 rejects GraphQL and SQL, recovery), cache age from probe start, RPC-only timeout, database-only timeout, native 503 vs 500/404, native timeout/failure, safe RPC codes/wrong chain, concurrent single flight, bounded mode. Re-introducing the old late-result caching makes 3 of them fail. |
 | `forge build --root /tmp/rental-reference --cache-path /tmp/rental-forge-cache --out /tmp/rental-build` | PASS; 46 source files, exact solc 0.8.26 |
 | `node scripts/extract-abis.mjs /tmp/rental-build --check` | PASS; ABIs, runtime code and fixture bytecode match compiled artifacts |
-| `pnpm test:integration` | PASS after this maintenance change against newly spawned loopback Anvil 31337 and persistent PGlite; includes ready, RPC-outage 503, safe JSON/no-store and recovery at the actual `/healthz` route; [result](evidence/integration.json) is prior retained evidence |
+| `pnpm test:integration` | PASS again after the health repair, against newly spawned loopback Anvil 31337 and persistent PGlite with real `ponder start`; all 7 checks including ready, RPC-outage 503 at `/healthz`/GraphQL with a safe `rpcError`, and recovery. [result](evidence/integration.json) is the retained record of the same check list. The same suite on PostgreSQL 17 (`TEST_DATABASE_URL`) was **NOT RUN** in this repair: no PostgreSQL or Docker on this worker. |
 | Fixed public backfill from both real deployment starts through 138754466 | PASS; 14 entity tables created, all events applied, `/ready` 200; 30-second uncached run, later replay used Ponder cache |
 | `API_URL=http://127.0.0.1:42805 pnpm check:queries` | PASS; all 14 documented GraphQL questions plus SQL HTTP |
 | `RECONCILE_STATE_RPC_URL=https://robinhood-testnet.drpc.org pnpm reconcile <captured snapshot>` | PASS at fixed canonical block, independent bounded event scan and historical calls |
