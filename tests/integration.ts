@@ -158,6 +158,10 @@ try {
     return snapshot();
   }
   let snap = await caughtUp();
+  const health = await fetch(`${base}/healthz`);
+  assert.equal(health.status, 200); assert.equal(health.headers.get("cache-control"), "no-store");
+  const healthBody = await health.json() as any;
+  assert.equal(healthBody.version, 1); assert.equal(healthBody.status, "ready"); assert.equal(typeof healthBody.lag, "string");
   assert.equal(snap.tables.reservation.length, 4);
   assert.equal(snap.tables.reservation.find(r => r.id === "1")!.deposit, "50000000");
   assert.equal(snap.tables.reservation.find(r => r.id === "1")!.reservationWindow, "3600");
@@ -208,9 +212,15 @@ try {
   assert.ok(status.rpcError); assert.equal(status.observedHead, null);
   const unavailable = await fetch(`${base}/graphql`, { method: "POST", headers: { "content-type": "application/json" }, body: '{"query":"{ accounting(id: \"rental\") { liabilities } }"}' });
   assert.equal(unavailable.status, 503);
+  const unavailableHealth = await fetch(`${base}/healthz`);
+  assert.equal(unavailableHealth.status, 503); assert.equal(unavailableHealth.headers.get("cache-control"), "no-store");
+  const unavailableBody = await unavailableHealth.json() as any;
+  assert.equal(unavailableBody.status, "unavailable"); assert.equal(unavailableBody.reason, "rpc_unavailable");
+  assert.equal(JSON.stringify(unavailableBody).includes("owned fixture outage"), false);
   outage = false; snap = await caughtUp();
+  assert.equal((await fetch(`${base}/healthz`)).status, 200);
   assert.equal(snap.tables.reservation.find(r => r.id === "4")!.status, "3");
-  checks.push("read-only RPC outage reported and serving gated, followed by canonical catch-up");
+  checks.push("read-only RPC outage reported by safe 503 /healthz and serving gate, then health/replay recovered");
   // Short reorg with same-height alternate block; mutate only this disposable chain.
   const snapshotId = await control("evm_snapshot");
   const orphan = await ew(nextAdmin, "setItemMetadata", [1n, "ipfs://orphan"]);

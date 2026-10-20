@@ -25,10 +25,14 @@ export const settings = {
   checkpointInterval: integer("CHECKPOINT_INTERVAL", 100),
   logRange: integer("RPC_LOG_RANGE", 500),
   timeout: integer("RPC_TIMEOUT_MS", 15000),
+  servingLag: integer("MAX_SERVING_LAG", 200),
+  healthTimeout: integer("HEALTH_TIMEOUT_MS", 2500),
+  healthCache: integer("HEALTH_CACHE_MS", 1000),
   reorgWindow: integer("REORG_WINDOW_SECONDS", 180),
 };
 if (settings.checkpointInterval < 1 || settings.checkpointInterval > 100) throw new Error("CHECKPOINT_INTERVAL must be 1..100");
 if (settings.logRange < 1 || settings.logRange > 1000 || settings.timeout < 100 || settings.timeout > 60000) throw new Error("RPC bounds invalid");
+if (settings.servingLag > 1_000_000 || settings.healthTimeout < 100 || settings.healthTimeout > 10000 || settings.healthCache < 100 || settings.healthCache > 60000) throw new Error("Health bounds invalid");
 if (chainId === 31337) {
   const url = new URL(settings.rpcUrl);
   if (url.protocol !== "http:" || !["127.0.0.1", "[::1]", "localhost"].includes(url.hostname)) throw new Error("Anvil requires HTTP loopback RPC");

@@ -103,7 +103,8 @@ Per-request timeout/range/retry limits and the 100,000-entity audit ceiling are 
 - `scripts/deployment.ts` / `scripts/build-id.mjs`: source plus deployment fingerprint; same release/config resumes, changed source/deployment gets a distinct schema. Prefix configurable; fingerprint cannot be bypassed with an address change.
 - Dockerfile: ordinary frozen-lockfile install on Node 22.22.0, build/typecheck, unprivileged runtime.
 - Compose: internal PostgreSQL with named volume; only indexer published on `127.0.0.1`; readiness healthcheck/start period 3600 seconds. No broad mounts, sockets or privileged containers.
-- `/graphql` and `/sql/*`: official public Ponder middleware; readiness/lag/RPC gating, query limits. `/sync` separately distinguishes completed checkpoint from observed head and errors. Snapshot is operator-only at the gateway.
+- `/healthz`: version-1 `ready`/`catching_up`/`unavailable` eligibility response with safe reason codes, bigint-safe strings and `Cache-Control: no-store`. A bounded, single-flight checkpoint/RPC/native-readiness observation is shared exactly with `/graphql` and `/sql/*`; it never exposes dependency exception text or endpoint/credential values. Live mode permits `MAX_SERVING_LAG` (default 200); bounded mode requires `END_BLOCK` even with a newer live head. This is freshness/dependency evidence, not finality/capacity/future-availability assurance.
+- `/graphql` and `/sql/*`: official public Ponder middleware; shared health eligibility gating plus existing query limits. `/sync` separately distinguishes completed checkpoint from observed head and errors. Snapshot is operator-only at the gateway.
 - Railway: root Dockerfile, platform port/interface, private PostgreSQL, `/ready` and 3600-second timeout; instructions only, **NOT RUN**.
 - Retention: old schemas preserved by default, no automatic prune. README documents separate-release rebuild/rollback, backup into a new database and destructive deliberate cleanup.
 

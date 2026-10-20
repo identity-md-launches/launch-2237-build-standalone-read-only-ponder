@@ -47,10 +47,11 @@ These are operator instructions; Docker/Compose deployment was **NOT RUN** on th
    docker compose up -d --build
    docker compose logs -f indexer
    curl -i http://127.0.0.1:42069/ready
+   curl -i http://127.0.0.1:42069/healthz
    curl -s http://127.0.0.1:42069/sync
    ```
 
-   `/ready` returns 503 during backfill and 200 after Ponder completes the configured historical range. The container healthcheck allows a **3600-second start period**, then checks every 15 seconds with a 5-second timeout. A container being alive or healthy is not proof of continuing freshness; monitor `/sync` and logs too.
+   `/ready` returns 503 during backfill and 200 after Ponder completes the configured historical range. Keep it as the deployment startup/traffic-switch check. The container healthcheck allows a **3600-second start period**, then checks every 15 seconds with a 5-second timeout. `/healthz` is the lightweight ongoing query-eligibility check; a `catching_up` response is not a reason to restart an otherwise healthy process.
 4. The only published port binds to **127.0.0.1** on the host. PostgreSQL has **no host port**. Data persists in the named `pgdata` volume. There are no Docker sockets, privileged services or host-directory mounts. `LOCAL_PORT` can change the loopback port; the internal indexer port stays 42069.
 5. Put a TLS reverse proxy with authentication, request limits and query timeouts in front of the indexer before exposing it. Keep `/snapshot` operator-only and protect SQL especially. Do not publish PostgreSQL. A reverse proxy on the host can reach `127.0.0.1:42069`; a proxy in another container must use the Compose service network, not that container's loopback.
 6. To update, pull the reviewed release and run `docker compose up -d --build` again. Compose stops the old indexer before starting the new one: **expect downtime while a changed release backfills**. The database volume and prior deployment schemas remain. Ordinary restarts with unchanged source/config resume the same schema.
@@ -77,15 +78,26 @@ No `railway.json` or `railway.toml` overrides the Dockerfile. Production never f
 | `/health` | Ponder process/server is up; may be incomplete or stale |
 | `/ready` | Ponder completed historical indexing for its configured target; does not continuously certify RPC freshness |
 | `/sync` | Recorded completed checkpoint **block number/hash/timestamp**, independently observed RPC head number/hash, observation time, signed block lag, RPC error, live/bounded mode |
+| `/healthz` | Versioned, safe query-serving eligibility observation; 200 only when `ready`, otherwise 503. It has `Cache-Control: no-store`. |
 | `/status` | Ponder's own indexed progress, not an independently observed head |
 | `/graphql` | Read-only entity queries, gated by readiness and observed lag/errors |
 | `/sql/db` | Ponder's read-only SQL HTTP protocol, gated the same way |
 | `/snapshot` | One-statement coherent database snapshot for operators/reconciliation; 503 if no checkpoint or events extend beyond it |
 | `/metrics` | Ponder metrics; restrict externally |
 
+`/healthz` has this stable version-1 shape. Blocks and lag are decimal strings so clients never lose bigint precision; unavailable values are `null`. It deliberately emits only safe reason codes, never a database URL, RPC URL, credential or raw dependency exception.
+
+```json
+{"version":1,"status":"ready","reason":null,"indexedCheckpoint":{"blockNumber":"138754400","blockHash":"0x…","timestamp":"1760000000"},"observedHead":{"blockNumber":"138754520","blockHash":"0x…"},"observedAt":"2026-10-20T12:00:00.000Z","lag":"120","servingLimit":"200","mode":"live","targetBlock":null}
+```
+
+`ready` means the native Ponder readiness check, PostgreSQL checkpoint read and independent RPC-head observation succeeded, and the completed checkpoint is within the serving policy. `catching_up` means a checkpoint is missing, native Ponder is still backfilling, or normal backlog exceeds the live limit. `unavailable` means a dependency failed or timed out. In live mode `servingLimit` is `MAX_SERVING_LAG` (default 200 blocks). In bounded mode it is `"0"`, `targetBlock` is the configured `END_BLOCK`, and readiness requires the checkpoint to reach that target even if the observed live head is newer. This is an observed freshness/dependency check only: it does **not** promise finality, capacity, future availability, complete RPC history, or immunity from reorgs.
+
+Health dependencies use `HEALTH_TIMEOUT_MS` (default 2500 ms) and their completed outcome is shared for `HEALTH_CACHE_MS` (default 1000 ms). At most one slow probe remains in flight; timeout returns an `unavailable` result rather than accumulating more database/RPC work. Set the health deadline below the platform's probe timeout. GraphQL and SQL use the same cached decision, so they agree with `/healthz` for the same observations.
+
 `/sync.indexed` is an actual onchain checkpoint row written after all logs in its block, never the RPC head relabeled as indexed progress. Default checkpoint spacing is **100 blocks**, so it is a conservative lower bound; GraphQL may contain more recent event state. `CHECKPOINT_INTERVAL=1` gives every-block checkpoints at higher RPC cost. Bounded runs additionally checkpoint exactly `END_BLOCK`.
 
-Head observations are cached for five seconds. `lag = observedHead.number - indexed.blockNumber`; it can briefly be negative when the indexer advances beyond a cached observation. Errors clear the current head to null rather than inventing progress. `rpcError` describes the independent head probe; detailed backfill/log RPC errors are reported in Ponder logs and metrics even if the head probe succeeds. `/sync` itself may be unavailable if the database/server is down. Alert on request failures, RPC errors, rising lag and a nonadvancing checkpoint even if `/ready` remains 200. GraphQL/SQL require `/ready`, no observed RPC error, and lag within `MAX_SERVING_LAG` (default 200); bounded runs require reaching the exact end block. An outage may remain undetected during the five-second observation cache.
+`lag = observedHead.number - indexed.blockNumber`; it can briefly be negative when the indexer advances beyond a cached observation. Errors clear the current head to null rather than inventing progress. `rpcError` describes the independent head probe; detailed backfill/log RPC errors are reported in Ponder logs and metrics even if the head probe succeeds. `/sync` itself may be unavailable if the database/server is down. Alert on request failures, `unavailable` health, rising lag and a nonadvancing checkpoint even if `/ready` remains 200. GraphQL/SQL require the shared `/healthz` decision to be ready; bounded runs require reaching the exact end block. A normal recovery is reflected after at most the configured health cache interval; a genuinely stuck dependency remains a single in-flight check and stays unavailable until it settles or the process is recovered.
 
 Latest results are **provisional**. Ponder handles canonical rollback within `REORG_WINDOW_SECONDS` (default 180 chain-timestamp seconds, supported range 0–600); neither that setting nor readiness establishes L1 settlement/finality. During reorg detection, stale/orphan data can be visible briefly. Deep reorgs, resets and inconsistent providers require investigation and deliberate replay into a new schema. Do not make irreversible equipment handovers based solely on this trial's index.
 
@@ -261,6 +273,12 @@ Ponder's rollback tables/checkpoints and sync cache remain under framework contr
 
 A changed release backfills a distinct schema and only then updates the stable `PONDER_VIEWS_SCHEMA` (default `rental`). Existing data is preserved by default; no startup code drops old schemas. Rebuild intentionally by choosing a new namespace prefix or reviewed release and waiting for `/ready`, then reconcile it. Rollback by restoring the previous image/source **and its deployment settings**, starting its old physical schema and switching API traffic after readiness; the old schema can catch up before its views are republished. Keep backups before changes. A code rollback does not reverse chain transactions.
 
+### API-only update and rollback procedure
+
+Treat an API/source update as a single-writer operation. First retain the currently running image, environment and computed physical schema; do not remove `pgdata`, run `down -v`, reset Ponder, or prune schemas. Build/pull the reviewed image, then stop the current **indexer only** before starting the replacement with the same PostgreSQL volume/service. Do not run two `ponder start` writers against one physical schema. Watch logs, `/ready`, then `/healthz` and one authenticated query before moving a reverse-proxy/API route. Compose has expected downtime while the replacement backfills; `/healthz: catching_up` calls for monitoring progress, not an automatic restart loop.
+
+To roll back the API, stop that replacement indexer, restore the retained prior image/source plus exactly its prior deployment settings, and start only that one writer against the preserved database/volumes. Wait for `/ready`, confirm `/healthz` and a query, then move API traffic back. Leave both schemas and the database volume intact until validation and the rollback window have passed. This procedure was reviewed against the deterministic-schema/start script; Docker/Compose, Railway traffic switching, backups and restore were **NOT RUN** on this worker.
+
 List and deliberately clean up only after verifying backups, retention and that no serving/rollback deployment needs those schemas:
 
 ```sh
@@ -297,10 +315,10 @@ Worker commands were run in a complete source copy under `test/scratch/project/`
 | `pnpm install --frozen-lockfile` in a clean copy | PASS (see final checks record) |
 | `pnpm codegen` | PASS; committed `ponder-env.d.ts` |
 | `pnpm typecheck` | PASS |
-| `pnpm test` | PASS; final count in [checks.json](evidence/checks.json) |
+| `pnpm test` | PASS in this maintenance change; 28 offline tests including `/healthz` HTTP/no-store JSON, shared eligibility, failures/timeouts and cache recovery |
 | `forge build --root /tmp/rental-reference --cache-path /tmp/rental-forge-cache --out /tmp/rental-build` | PASS; 46 source files, exact solc 0.8.26 |
 | `node scripts/extract-abis.mjs /tmp/rental-build --check` | PASS; ABIs, runtime code and fixture bytecode match compiled artifacts |
-| `pnpm test:integration` | PASS against newly spawned loopback Anvil 31337 and persistent PGlite; [result](evidence/integration.json) |
+| `pnpm test:integration` | PASS after this maintenance change against newly spawned loopback Anvil 31337 and persistent PGlite; includes ready, RPC-outage 503, safe JSON/no-store and recovery at the actual `/healthz` route; [result](evidence/integration.json) is prior retained evidence |
 | Fixed public backfill from both real deployment starts through 138754466 | PASS; 14 entity tables created, all events applied, `/ready` 200; 30-second uncached run, later replay used Ponder cache |
 | `API_URL=http://127.0.0.1:42805 pnpm check:queries` | PASS; all 14 documented GraphQL questions plus SQL HTTP |
 | `RECONCILE_STATE_RPC_URL=https://robinhood-testnet.drpc.org pnpm reconcile <captured snapshot>` | PASS at fixed canonical block, independent bounded event scan and historical calls |
@@ -314,4 +332,4 @@ There are no public-testnet transaction tests, load benchmarks, deep-reorg guara
 
 ## Packaging repair
 
-The upload rejected the previous generated dependency store (89,578,772 compressed source bytes, limit 8,388,608). Removed only the vendored pnpm cache, its forced offline configuration and Docker copy. Exact dependency declarations, lockfile, application source, fixtures and prior runtime evidence are retained. The Dockerfile and ordinary pnpm commands now install from the registry. This resolves source size but leaves the original network-free installation requirement **UNMET**; no dependency archive or hidden downloader replaces the store. Earlier offline-install evidence applies to the previous bundle, not this repair. Clean registry install, codegen, typecheck and all 23 unit tests passed after this change. The source archive measured about 107 KB, below 8 MiB; even a lossless xz archive of the full store measured 53 MiB. Public RPC and integration checks were not rerun for this packaging-only repair. Current checks are recorded in `evidence/packaging-repair.json`.
+The upload rejected the previous generated dependency store (89,578,772 compressed source bytes, limit 8,388,608). Removed only the vendored pnpm cache, its forced offline configuration and Docker copy. Exact dependency declarations, lockfile, application source, fixtures and prior runtime evidence are retained. The Dockerfile and ordinary pnpm commands now install from the registry. This resolves source size but leaves the original network-free installation requirement **UNMET**; no dependency archive or hidden downloader replaces the store. Earlier offline-install evidence applies to the previous bundle, not this repair. At the time of that packaging-only repair, clean registry install, codegen, typecheck and 23 unit tests passed. The source archive measured about 107 KB, below 8 MiB; even a lossless xz archive of the full store measured 53 MiB. Public RPC and integration checks were not rerun for that packaging-only repair. Current checks are recorded in `evidence/packaging-repair.json` and the maintenance-check table above.
